@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>고전 역학 계산기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+  <div class="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg mt-10">
+    <h1 class="text-3xl font-bold text-center mb-8 text-blue-600">고전 역학 계산기</h1>
+
+    <div class="mb-8">
+      <h2 class="text-xl font-semibold mb-4 text-gray-700">너가 구하고 싶은게 뭐야?</h2>
+      <div id="findOptions" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+    </div>
+
+    <div id="requirements" class="mb-6 hidden">
+      <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-6">
+        <h3 class="text-md font-semibold mb-2 text-yellow-800">
+          최소 필요한 정보
+        </h3>
+        <div id="requiredInfoList" class="space-y-1"></div>
+      </div>
+
+      <h2 class="text-xl font-semibold mb-4 text-gray-700">너가 아는 정보는 뭐야?</h2>
+      <div id="knownInputs" class="space-y-4"></div>
+    </div>
+
+    <div id="actions" class="mb-8 hidden">
+      <div class="flex space-x-4">
+        <button id="calculateBtn" class="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+          계산하기
+        </button>
+        <button id="resetBtn" class="px-6 py-3 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
+          초기화
+        </button>
+      </div>
+    </div>
+
+    <div id="result" class="hidden bg-blue-50 p-6 rounded-lg border border-blue-200">
+      <h3 class="text-lg font-semibold mb-3 text-blue-800">계산 결과</h3>
+      <p id="resultText" class="text-2xl font-bold text-blue-600 mb-4"></p>
+    </div>
+  </div>
+
+  <script>
+    const variables = {
+      v0: '처음 속도 (v₀)',
+      v: '나중 속도 (v)',
+      a: '가속도 (a)',
+      t: '이동 시간 (t)',
+      s: '변위 (s)'
+    };
+
+    const requirements = {
+      v: ['v₀, a, t', 'v₀, a, s'],
+      v0: ['v, a, t', 'v, a, s'],
+      a: ['v, v₀, t', 'v, v₀, s'],
+      t: ['v, v₀, a', 's, v₀, a'],
+      s: ['v₀, t, a', 'v, v₀, a']
+    };
+
+    let wantToFind = '';
+    let knownValues = {};
+    let inputs = {};
+
+    const findOptions = document.getElementById('findOptions');
+    const requirementsDiv = document.getElementById('requirements');
+    const requiredInfoList = document.getElementById('requiredInfoList');
+    const knownInputs = document.getElementById('knownInputs');
+    const actionsDiv = document.getElementById('actions');
+    const calculateBtn = document.getElementById('calculateBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const resultDiv = document.getElementById('result');
+    const resultText = document.getElementById('resultText');
+
+    Object.entries(variables).forEach(([key, label]) => {
+      const labelEl = document.createElement('label');
+      labelEl.className = 'flex items-center space-x-2 cursor-pointer';
+      labelEl.innerHTML = `<input type="radio" name="find" value="${key}" class="w-4 h-4 text-blue-600" />
+                          <span class="text-gray-700">${label}</span>`;
+      findOptions.appendChild(labelEl);
+      labelEl.querySelector('input').addEventListener('change', () => selectFind(key));
+    });
+
+    function selectFind(target) {
+      wantToFind = target;
+      requirementsDiv.classList.remove('hidden');
+      actionsDiv.classList.remove('hidden');
+      knownInputs.innerHTML = '';
+      requiredInfoList.innerHTML = '';
+      inputs = {};
+      knownValues = {};
+
+      requirements[target].forEach(info => {
+        const p = document.createElement('p');
+        p.className = 'text-sm text-yellow-700';
+        p.textContent = '• ' + info;
+        requiredInfoList.appendChild(p);
+      });
+
+      Object.entries(variables).forEach(([key, label]) => {
+        if (key === target) return;
+        const div = document.createElement('div');
+        div.className = 'flex items-center space-x-4';
+        div.innerHTML = `
+          <label class="flex items-center space-x-2 cursor-pointer min-w-[160px]">
+            <input type="checkbox" data-key="${key}" class="w-4 h-4 text-blue-600" />
+            <span class="text-gray-700">${label}</span>
+          </label>
+        `;
+        const inputEl = document.createElement('input');
+        inputEl.type = 'number';
+        inputEl.step = 'any';
+        inputEl.placeholder = '값을 입력하세요';
+        inputEl.className = 'flex-1 px-3 py-2 border border-gray-300 rounded-md';
+        inputEl.style.display = 'none';
+
+        div.appendChild(inputEl);
+        knownInputs.appendChild(div);
+
+        div.querySelector('input[type=checkbox]').addEventListener('change', (e) => {
+          if (e.target.checked) {
+            inputEl.style.display = 'block';
+          } else {
+            inputEl.style.display = 'none';
+            delete inputs[key];
+            delete knownValues[key];
+          }
+        });
+
+        inputEl.addEventListener('input', () => {
+          knownValues[key] = true;
+          inputs[key] = parseFloat(inputEl.value) || 0;
+        });
+      });
+    }
+
+    calculateBtn.onclick = () => {
+      const w = inputs;
+      const v0 = w.v0, v = w.v, a = w.a, t = w.t, s = w.s;
+      let result = null;
+      try {
+        if (wantToFind === 'v' && v0 !== undefined && a !== undefined && t !== undefined) result = v0 + a * t;
+        else if (wantToFind === 's' && v0 !== undefined && t !== undefined && a !== undefined) result = v0 * t + 0.5 * a * t * t;
+        else if (wantToFind === 'v' && v0 !== undefined && a !== undefined && s !== undefined) result = Math.sqrt(v0 ** 2 + 2 * a * s);
+        else if (wantToFind === 'v0' && v !== undefined && a !== undefined && t !== undefined) result = v - a * t;
+        else if (wantToFind === 'a' && v !== undefined && v0 !== undefined && t !== undefined) result = (v - v0) / t;
+        else if (wantToFind === 't' && v !== undefined && v0 !== undefined && a !== undefined) result = (v - v0) / a;
+        else if (wantToFind === 'a' && v !== undefined && v0 !== undefined && s !== undefined) result = (v ** 2 - v0 ** 2) / (2 * s);
+        else if (wantToFind === 's' && v !== undefined && v0 !== undefined && a !== undefined) result = (v ** 2 - v0 ** 2) / (2 * a);
+        else result = '계산할 수 없습니다. 값이 부족합니다.';
+
+        resultText.innerText = `${variables[wantToFind]}: ${typeof result === 'number' ? result.toFixed(3) : result}`;
+        resultDiv.classList.remove('hidden');
+      } catch {
+        resultText.innerText = '계산 오류';
+        resultDiv.classList.remove('hidden');
+      }
+    };
+
+    resetBtn.onclick = () => {
+      wantToFind = '';
+      inputs = {};
+      knownValues = {};
+      findOptions.querySelectorAll('input').forEach(i => i.checked = false);
+      requirementsDiv.classList.add('hidden');
+      actionsDiv.classList.add('hidden');
+      resultDiv.classList.add('hidden');
+    };
+  </script>
+</body>
+</html>
